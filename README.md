@@ -13,9 +13,12 @@ aWSGI is an asynchronous WSGI server based on asyncio. It's designed to support 
 
 ## install
 prerequisite
+
  * python >=3.5
  * uvloop
  * httptools
+
+install for development
 
 	git clone git@github.com:youngrok/awsgi.git
 	cd awsgi
