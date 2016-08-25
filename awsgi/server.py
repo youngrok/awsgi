@@ -1,15 +1,19 @@
 import argparse
 import asyncio
-import importlib
 import socket
 import traceback
+from concurrent.futures.thread import ThreadPoolExecutor
 from importlib import machinery
 
 import httptools
 import sys
+
+import uvloop
 from werkzeug.urls import url_parse, url_unquote
 
+asyncio.set_event_loop_policy(uvloop.EventLoopPolicy())
 loop = asyncio.get_event_loop()
+executor = ThreadPoolExecutor(max_workers=20)
 
 
 class HttpProtocol(asyncio.Protocol):
@@ -22,6 +26,8 @@ class HttpProtocol(asyncio.Protocol):
         self.headers = {}
         self.path = None
         self.body_queue = []
+        self.content_length = 0
+        self.closed = False
 
     def connection_made(self, transport):
         self.transport = transport
@@ -41,7 +47,7 @@ class HttpProtocol(asyncio.Protocol):
             traceback.print_exc()
 
     def on_headers_complete(self):
-        loop.call_soon(self.handle)
+        loop.run_in_executor(executor, self.process_response)
 
     def on_url(self, url):
         self.path = url
@@ -52,8 +58,10 @@ class HttpProtocol(asyncio.Protocol):
     def read(self):
         return self.body_queue.pop(0)
 
-    def handle(self):
+    def eof_received(self):
+        self.closed = True
 
+    def process_response(self):
         try:
             it = self.application(self.make_environ(), self.start_response)
             self.transport.write(b'\r\n')
@@ -61,14 +69,19 @@ class HttpProtocol(asyncio.Protocol):
                 self.transport.write(data)
 
             # self.transport.write('Content-Length: {}\r\n'.format(len(b)).encode('utf8'))
-            self.transport.write_eof()
+            if not self.closed:
+                self.transport.write_eof()
         except:
             traceback.print_exc()
-            self.transport.write_eof()
+            if not self.closed:
+                self.transport.write_eof()
 
     def start_response(self, status, response_headers):
         self.transport.write('HTTP/1.1 {}\r\n'.format(status).encode('utf8'))
         for header in response_headers:
+            if header[0].lower() == 'content-length':
+                self.content_length = header[1]
+
             self.transport.write('{0}: {1}\r\n'.format(header[0], header[1]).encode('utf8'))
 
     def make_environ(self):
@@ -117,7 +130,7 @@ if __name__ == '__main__':
     args = parser.parse_args()
     wsgi_module = machinery.SourceFileLoader('wsgi', args.wsgifile).load_module()
 
-    server = loop.run_until_complete(loop.create_server(lambda: HttpProtocol(wsgi_module.application, loop), host='127.0.0.1', port=9000))
+    server = loop.run_until_complete(loop.create_server(lambda: HttpProtocol(wsgi_module.application, loop), host='127.0.0.1', port=8000))
     print('serving on', server.sockets[0].getsockname())
     try:
         loop.run_forever()
