@@ -2,11 +2,11 @@ import os
 from setuptools import setup, find_packages
 
 
-setup(name='expresspy',
-      description='python version of express.js',
+setup(name='awsgi',
+      description='asynchronous wsgi server',
       author='Youngrok Pak',
       author_email='pak.youngrok@gmail.com',
-      keywords= 'expressjs asyncio http server web',
+      keywords= 'asyncio http server wsgi',
       url='https://github.com/youngrok/awsgi',
       version='0.0.1',
       packages=find_packages(),

@@ -1,6 +1,8 @@
 # aWSGI - Asynchronous WSGI server
 aWSGI is an asynchronous WSGI server based on asyncio. It's designed to support both standard wsgi application and coroutine.
 
+**DO NOT USE IN PRODUCTION**
+
 ## design goal
  * conform WSGI standard
  * support WSGI-like coroutine(async/await)
@@ -10,15 +12,19 @@ aWSGI is an asynchronous WSGI server based on asyncio. It's designed to support 
  * connect nginx
 
 ## install
+prerequisite
+ * python >=3.5
+ * uvloop
+ * httptools
 
-	pip install awsgi
+	git clone git@github.com:youngrok/awsgi.git
+	cd awsgi
+	python setup.py develop
+	
+awsgi cannot be installed with PyPI because it's status is not production ready.
 
 ## usage
 ### command line
 	
-	awsgi wsgi_file
-	
-### systemd
-	
-	systemctl start awsgi
+	python -m awsgi.server wsgi_file
 	
