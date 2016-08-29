@@ -1,5 +1,5 @@
-async def async_app(environ, start_response):
+async def application(environ, start_response):
     response_headers = [('Content-type', 'text/plain')]
     start_response('200 OK', response_headers)
-    return [b'Hello world!\n']
+    return [b'Hello async!\n']
 

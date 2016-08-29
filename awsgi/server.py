@@ -9,6 +9,7 @@ import httptools
 import sys
 
 import uvloop
+from httptools.parser.errors import HttpParserUpgrade
 from werkzeug.urls import url_parse, url_unquote
 
 asyncio.set_event_loop_policy(uvloop.EventLoopPolicy())
@@ -28,6 +29,8 @@ class HttpProtocol(asyncio.Protocol):
         self.body_queue = []
         self.content_length = 0
         self.closed = False
+        self.upgrade = False
+        self.websocket_protocol = None
 
     def connection_made(self, transport):
         self.transport = transport
@@ -38,7 +41,17 @@ class HttpProtocol(asyncio.Protocol):
             pass
 
     def data_received(self, data):
-        self.parser.feed_data(data)
+        if self.websocket_protocol:
+            self.websocket_protocol.data_received(data)
+            return
+
+        try:
+            self.parser.feed_data(data)
+        except HttpParserUpgrade as e:
+            '''
+            let framework handle protocol upgrade
+            '''
+            self.upgrade = True
 
     def on_header(self, name, value):
         try:
@@ -47,7 +60,10 @@ class HttpProtocol(asyncio.Protocol):
             traceback.print_exc()
 
     def on_headers_complete(self):
-        loop.run_in_executor(executor, self.process_response)
+        if asyncio.iscoroutinefunction(self.application):
+            asyncio.ensure_future(self.async_process_response(), loop=self.loop)
+        else:
+            loop.run_in_executor(executor, self.process_response)
 
     def on_url(self, url):
         self.path = url
@@ -61,28 +77,52 @@ class HttpProtocol(asyncio.Protocol):
     def eof_received(self):
         self.closed = True
 
+    async def async_process_response(self):
+        try:
+            it = await self.application(self.make_environ(), self.start_response)
+            self.write(b'\r\n')
+            for data in it:
+                self.write(data)
+
+            # self.transport.write('Content-Length: {}\r\n'.format(len(b)).encode('utf8'))
+            self.write_eof()
+        except:
+            traceback.print_exc()
+            self.write_eof()
+
+    def write(self, data):
+        print('write', data)
+        self.transport.write(data)
+
+    def write_eof(self):
+        if not self.closed and not self.upgrade:
+            self.write_eof()
+
     def process_response(self):
         try:
             it = self.application(self.make_environ(), self.start_response)
-            self.transport.write(b'\r\n')
+            self.write(b'\r\n')
             for data in it:
-                self.transport.write(data)
+                self.write(data)
 
             # self.transport.write('Content-Length: {}\r\n'.format(len(b)).encode('utf8'))
             if not self.closed:
-                self.transport.write_eof()
+                self.write_eof()
         except:
             traceback.print_exc()
             if not self.closed:
-                self.transport.write_eof()
+                self.write_eof()
 
     def start_response(self, status, response_headers):
-        self.transport.write('HTTP/1.1 {}\r\n'.format(status).encode('utf8'))
+        self.write('HTTP/1.1 {}\r\n'.format(status).encode('utf8'))
         for header in response_headers:
             if header[0].lower() == 'content-length':
                 self.content_length = header[1]
 
-            self.transport.write('{0}: {1}\r\n'.format(header[0], header[1]).encode('utf8'))
+            if header[0].lower() == 'connection' and header[1].lower() == 'upgrade':
+                self.upgrade = True
+
+            self.write('{0}: {1}\r\n'.format(header[0], header[1]).encode('utf8'))
 
     def make_environ(self):
         request_url = url_parse(self.path)
@@ -120,6 +160,10 @@ class HttpProtocol(asyncio.Protocol):
             environ['HTTP_HOST'] = request_url.netloc
 
         return environ
+
+    def set_websocket_protocol(self, websocket_protocol):
+        self.websocket_protocol = websocket_protocol
+        websocket_protocol.connection_made(self.transport)
 
 
 if __name__ == '__main__':
