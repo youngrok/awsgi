@@ -26,7 +26,7 @@ async def application(environ, start_response):
             async def message_received(self, message):
                 await self.send(message)
 
-        environ['wsgi.input'].set_websocket_protocol(EchoProtocol())
+        environ['wsgi.input'].set_websocket_protocol(EchoProtocol)
 
         return []
 

@@ -2,6 +2,7 @@ import asyncio
 import asyncio.queues
 import logging
 
+import websockets
 from websockets.exceptions import (PayloadTooBig,
                          WebSocketProtocolError)
 from websockets.protocol import WebSocketCommonProtocol
@@ -10,6 +11,9 @@ logger = logging.getLogger(__name__)
 
 
 class WebSocketProtocol(WebSocketCommonProtocol):
+
+    def __init__(self, loop):
+        super().__init__(loop=loop)
 
     async def run(self):
         # This coroutine guarantees that the connection is closed at exit.
@@ -39,3 +43,20 @@ class WebSocketProtocol(WebSocketCommonProtocol):
 
     async def message_received(self, message):
         raise NotImplementedError
+
+
+class WebSocketHandshakeResponse(list):
+
+    def __init__(self, environ):
+        self.headers = []
+        self.environ = environ
+        self.status = '101 Switching Protocols'
+
+        websocket_key = websockets.handshake.check_request(self.get_request_header)
+        websockets.handshake.build_response(self.set_response_header, websocket_key)
+
+    def get_request_header(self, key):
+        return self.environ.get('HTTP_' + key.upper().replace('-', '_'), '')
+
+    def set_response_header(self, key, value):
+        self.headers.append((key, value))

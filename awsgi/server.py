@@ -157,13 +157,13 @@ class HttpProtocol(asyncio.Protocol):
         return environ
 
     def set_websocket_protocol(self, websocket_protocol):
-        self.websocket_protocol = websocket_protocol
-        websocket_protocol.connection_made(self.transport)
+        self.websocket_protocol = websocket_protocol(self.loop)
+        self.websocket_protocol.connection_made(self.transport)
 
 
-def serve(application, host='127.0.0.1', port=8000, threads=1):
+def serve(application, host='127.0.0.1', port=8000, threads=1, loop=None):
     asyncio.set_event_loop_policy(uvloop.EventLoopPolicy())
-    loop = asyncio.get_event_loop()
+    loop = loop or asyncio.get_event_loop()
     loop.set_default_executor(ThreadPoolExecutor(max_workers=threads))
 
     server = loop.run_until_complete(
