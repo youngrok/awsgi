@@ -8,7 +8,7 @@ setup(name='awsgi',
       author_email='pak.youngrok@gmail.com',
       keywords= 'asyncio http server wsgi',
       url='https://github.com/youngrok/awsgi',
-      version='0.0.1',
+      version='0.0.2',
       packages=find_packages(),
       classifiers = [
                      'Development Status :: 3 - Alpha',
