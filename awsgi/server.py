@@ -1,5 +1,6 @@
 import argparse
 import asyncio
+import io
 import socket
 import traceback
 from concurrent.futures.thread import ThreadPoolExecutor
@@ -13,7 +14,7 @@ from httptools.parser.errors import HttpParserUpgrade
 from werkzeug.urls import url_parse, url_unquote
 
 
-class HttpProtocol(asyncio.Protocol):
+class AsyncWSGIProtocol(asyncio.Protocol):
 
     def __init__(self, application, loop=None):
         self.loop = loop or asyncio.get_event_loop()
@@ -22,7 +23,7 @@ class HttpProtocol(asyncio.Protocol):
         self.application = application
         self.headers = {}
         self.path = None
-        self.body_queue = []
+        self.buffer = io.BytesIO()
         self.content_length = 0
         self.closed = False
         self.upgrade = False
@@ -37,6 +38,7 @@ class HttpProtocol(asyncio.Protocol):
             pass
 
     def data_received(self, data):
+
         if self.websocket_protocol:
             self.websocket_protocol.data_received(data)
             return
@@ -65,10 +67,11 @@ class HttpProtocol(asyncio.Protocol):
         self.path = url
 
     def on_body(self, data):
-        self.body_queue.append(data)
+        self.buffer.write(data)
 
-    def read(self):
-        return self.body_queue.pop(0)
+    def read(self, size=-1):
+        self.buffer.seek(0)
+        return self.buffer.read(size)
 
     def eof_received(self):
         self.closed = True
@@ -167,7 +170,7 @@ def serve(application, host='127.0.0.1', port=8000, threads=1, loop=None):
     loop.set_default_executor(ThreadPoolExecutor(max_workers=threads))
 
     server = loop.run_until_complete(
-        loop.create_server(lambda: HttpProtocol(application, loop), host=host, port=port))
+        loop.create_server(lambda: AsyncWSGIProtocol(application, loop), host=host, port=port))
     print('aWSGI server started at http://{0}:{1}/'.format(*server.sockets[0].getsockname()))
     print('{} threads working.'.format(threads))
     print('Quit server with {}'.format('CTRL-BREAK' if sys.platform == 'win32' else 'CONTROL-C'))
