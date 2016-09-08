@@ -13,6 +13,8 @@ import uvloop
 from httptools.parser.errors import HttpParserUpgrade
 from werkzeug.urls import url_parse, url_unquote
 
+from awsgi.blockingio import BlockingIO
+
 
 class AsyncWSGIProtocol(asyncio.Protocol):
 
@@ -23,7 +25,7 @@ class AsyncWSGIProtocol(asyncio.Protocol):
         self.application = application
         self.headers = {}
         self.path = None
-        self.buffer = io.BytesIO()
+        self.buffer = BlockingIO()
         self.content_length = 0
         self.closed = False
         self.upgrade = False
@@ -77,9 +79,9 @@ class AsyncWSGIProtocol(asyncio.Protocol):
         self.body_read_pos += len(result)
         return result
 
-
     def eof_received(self):
         self.closed = True
+        self.buffer.feed_eof()
 
     async def async_process_response(self):
         try:
@@ -134,9 +136,10 @@ class AsyncWSGIProtocol(asyncio.Protocol):
         path_info = url_unquote(request_url.path)
 
         environ = {
+            'awsgi.protocol': self,
             'wsgi.version': (1, 0),
             'wsgi.url_scheme': 'http',
-            'wsgi.input': self,
+            'wsgi.input': self.buffer,
             'wsgi.errors': sys.stderr,
             'wsgi.multithread': False,
             'wsgi.multiprocess': False,
