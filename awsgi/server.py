@@ -28,6 +28,7 @@ class AsyncWSGIProtocol(asyncio.Protocol):
         self.closed = False
         self.upgrade = False
         self.websocket_protocol = None
+        self.body_read_pos = 0
 
     def connection_made(self, transport):
         self.transport = transport
@@ -67,11 +68,15 @@ class AsyncWSGIProtocol(asyncio.Protocol):
         self.path = url
 
     def on_body(self, data):
+        self.buffer.seek(0, io.SEEK_END)
         self.buffer.write(data)
 
     def read(self, size=-1):
-        self.buffer.seek(0)
-        return self.buffer.read(size)
+        self.buffer.seek(self.body_read_pos)
+        result = self.buffer.read(size)
+        self.body_read_pos += len(result)
+        return result
+
 
     def eof_received(self):
         self.closed = True
