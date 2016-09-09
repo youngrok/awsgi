@@ -5,6 +5,8 @@ import time
 
 class BlockingIO(io.BytesIO):
 
+    timeout = 1
+
     def __init__(self, initial_bytes=None):
         super().__init__(initial_bytes)
         self.got_eof = False
@@ -15,14 +17,14 @@ class BlockingIO(io.BytesIO):
 
         result = None
         while not result:
-            # time.sleep(1)
             if self.got_eof:
                 return b''
 
             result = super().readline(size)
+            if not result:
+                time.sleep(0.01)
 
         self.read_pos += len(result)
-
         return result
 
     def read(self, size=-1):
@@ -30,11 +32,12 @@ class BlockingIO(io.BytesIO):
 
         result = None
         while not result:
-            # time.sleep(1)
             if self.got_eof:
                 return b''
 
             result = super().read(size)
+            if not result:
+                time.sleep(0.01)
 
         self.read_pos += len(result)
 

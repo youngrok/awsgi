@@ -73,8 +73,13 @@ class AsyncWSGIProtocol(asyncio.Protocol):
         self.buffer.seek(0, io.SEEK_END)
         self.buffer.write(data)
 
-    def eof_received(self):
+    def on_message_complete(self):
+        self.buffer.feed_eof()
+
+    def connection_lost(self, exc):
         self.closed = True
+
+    def eof_received(self):
         self.buffer.feed_eof()
 
     async def async_process_response(self):
