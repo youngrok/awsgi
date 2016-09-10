@@ -78,6 +78,8 @@ class AsyncWSGIProtocol(asyncio.Protocol):
 
     def connection_lost(self, exc):
         self.closed = True
+        if self.websocket_protocol:
+            self.websocket_protocol.connection_lost(exc)
 
     def eof_received(self):
         self.buffer.feed_eof()
