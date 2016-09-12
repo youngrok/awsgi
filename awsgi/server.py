@@ -14,6 +14,7 @@ from httptools.parser.errors import HttpParserUpgrade
 from werkzeug.urls import url_parse, url_unquote
 
 from awsgi.blockingio import BlockingIO
+from awsgi.wsgi import adapter
 
 
 class AsyncWSGIProtocol(asyncio.Protocol):
@@ -61,10 +62,7 @@ class AsyncWSGIProtocol(asyncio.Protocol):
             traceback.print_exc()
 
     def on_headers_complete(self):
-        if asyncio.iscoroutinefunction(self.application):
-            asyncio.ensure_future(self.async_process_response(), loop=self.loop)
-        else:
-            self.loop.run_in_executor(None, self.process_response)
+        asyncio.ensure_future(self.async_process_response(), loop=self.loop)
 
     def on_url(self, url):
         self.path = url
@@ -103,21 +101,6 @@ class AsyncWSGIProtocol(asyncio.Protocol):
     def write_eof(self):
         if not self.closed and not self.upgrade:
             self.transport.write_eof()
-
-    def process_response(self):
-        try:
-            it = self.application(self.make_environ(), self.start_response)
-            self.write(b'\r\n')
-            for data in it:
-                self.write(data)
-
-            # self.transport.write('Content-Length: {}\r\n'.format(len(b)).encode('utf8'))
-            if not self.closed:
-                self.write_eof()
-        except:
-            traceback.print_exc()
-            if not self.closed:
-                self.write_eof()
 
     def start_response(self, status, response_headers):
         self.write('HTTP/1.1 {}\r\n'.format(status).encode('utf8'))
@@ -173,10 +156,12 @@ class AsyncWSGIProtocol(asyncio.Protocol):
         self.websocket_protocol.connection_made(self.transport)
 
 
-def serve(application, host='127.0.0.1', port=8000, threads=1, loop=None):
+def serve(application, host='127.0.0.1', port=8000, threads=1, wsgi=False, loop=None):
     asyncio.set_event_loop_policy(uvloop.EventLoopPolicy())
     loop = loop or asyncio.get_event_loop()
     loop.set_default_executor(ThreadPoolExecutor(max_workers=threads))
+    if wsgi:
+        application = adapter(application)
 
     server = loop.run_until_complete(
         loop.create_server(lambda: AsyncWSGIProtocol(application, loop), host=host, port=port))
@@ -198,17 +183,19 @@ def serve(application, host='127.0.0.1', port=8000, threads=1, loop=None):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='aWSGI server')
-    parser.add_argument('wsgifile', metavar='<wsgi file>',
-                        help='wsgi file that contains wsgi application')
+    parser.add_argument('awsgifile', metavar='<awsgi file>',
+                        help='awsgi file that contains application coroutine')
     parser.add_argument('--host', metavar='host', default='127.0.0.1',
                         help='host to listen. default: 127.0.0.1')
     parser.add_argument('--port', metavar='port', default=80, type=int,
                         help='port to listen. default: 8000')
-    parser.add_argument('--num_threads', metavar='num-threads', default=1, type=int,
+    parser.add_argument('--threads', metavar='threads', default=1, type=int,
                         help='number of threads. default: 1')
+    parser.add_argument('--wsgi', metavar='wsgi', default=False, type=bool,
+                        help='WSGI compliant mode')
 
     args = parser.parse_args()
 
-    wsgi_module = machinery.SourceFileLoader('wsgi', args.wsgifile).load_module()
+    awsgi_module = machinery.SourceFileLoader('awsgi', args.awsgifile).load_module()
 
-    serve(wsgi_module.application)
+    serve(awsgi_module.application, host=parser.host, port=parser.port, threads=parser.threads, wsgi=parser.wsgi)

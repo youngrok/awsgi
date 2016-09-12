@@ -13,7 +13,7 @@ from sample import wsgiapp, asyncapp, websocketapp, wsgiupload
 class WSGITest(unittest.TestCase):
 
     def test_plaintext(self):
-        p = Process(target=serve, args=[wsgiapp.application])
+        p = Process(target=serve, args=[wsgiapp.application], kwargs={'wsgi': True})
         p.start()
         self.assertEqual('Hello world!\n', requests.get('http://127.0.0.1:8000').text)
         p.terminate()
