@@ -1,4 +1,5 @@
 import io
+import time
 
 
 class BlockingIO(io.BytesIO):
@@ -10,12 +11,12 @@ class BlockingIO(io.BytesIO):
         self.got_eof = False
         self.read_pos = 0
 
-    def readline(self, size=-1):
-        self.seek(self.read_pos)
+    def readline(self):
 
         result = b''
         while not result:
-            result = super().readline(size)
+            self.seek(self.read_pos)
+            result = super().readline()
 
             if self.got_eof:
                 return result
@@ -25,10 +26,10 @@ class BlockingIO(io.BytesIO):
         return result
 
     def read(self, size=-1):
-        self.seek(self.read_pos)
 
         result = b''
         while not result:
+            self.seek(self.read_pos)
             result = super().read(size)
 
             if self.got_eof:
