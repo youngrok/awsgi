@@ -32,7 +32,7 @@ class BlockingIO(io.BytesIO):
             result = super().read(size)
 
             if self.got_eof:
-                return result
+                break
 
         self.read_pos += len(result)
 

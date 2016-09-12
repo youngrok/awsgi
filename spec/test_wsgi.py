@@ -7,7 +7,7 @@ from multiprocessing import Process
 import websockets.client
 
 from awsgi.server import serve
-from sample import wsgiapp, asyncapp, websocketapp
+from sample import wsgiapp, asyncapp, websocketapp, wsgiupload
 
 
 class WSGITest(unittest.TestCase):
@@ -38,6 +38,19 @@ class WSGITest(unittest.TestCase):
                 self.assertEqual("Websocket Rocks!", await client.recv())
 
         loop.run_until_complete(test_echo())
+
+        p.terminate()
+        p.join()
+
+    def test_upload(self):
+        p = Process(target=serve, args=[wsgiupload.application])
+        p.start()
+
+        res = requests.post('http://localhost:8000/',
+                            files={'file': open('../sample/hearthstone-7level.png', 'rb')})
+
+        with open('../sample/hearthstone-7level.png', 'rb') as f:
+            self.assertSequenceEqual(f.read(), res.content)
 
         p.terminate()
         p.join()
