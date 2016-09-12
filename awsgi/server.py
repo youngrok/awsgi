@@ -187,7 +187,7 @@ if __name__ == '__main__':
                         help='awsgi file that contains application coroutine')
     parser.add_argument('--host', metavar='host', default='127.0.0.1',
                         help='host to listen. default: 127.0.0.1')
-    parser.add_argument('--port', metavar='port', default=80, type=int,
+    parser.add_argument('--port', metavar='port', default=8000, type=int,
                         help='port to listen. default: 8000')
     parser.add_argument('--threads', metavar='threads', default=1, type=int,
                         help='number of threads. default: 1')
@@ -198,4 +198,4 @@ if __name__ == '__main__':
 
     awsgi_module = machinery.SourceFileLoader('awsgi', args.awsgifile).load_module()
 
-    serve(awsgi_module.application, host=parser.host, port=parser.port, threads=parser.threads, wsgi=parser.wsgi)
+    serve(awsgi_module.application, host=args.host, port=args.port, threads=args.threads, wsgi=args.wsgi)
