@@ -68,8 +68,7 @@ class AsyncWSGIProtocol(asyncio.Protocol):
         self.path = url
 
     def on_body(self, data):
-        self.buffer.seek(0, io.SEEK_END)
-        self.buffer.write(data)
+        self.buffer.feed_data(data)
 
     def on_message_complete(self):
         self.buffer.feed_eof()

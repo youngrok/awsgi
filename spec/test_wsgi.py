@@ -1,4 +1,5 @@
 import asyncio
+import traceback
 import unittest
 
 import requests
@@ -46,11 +47,17 @@ class WSGITest(unittest.TestCase):
         p = Process(target=serve, args=[wsgiupload.application])
         p.start()
 
-        res = requests.post('http://localhost:8000/',
-                            files={'file': open('../sample/hearthstone-7level.png', 'rb')})
+        fails = 0
+        for i in range(0, 10):
+            res = requests.post('http://localhost:8000/',
+                                files={'file': open('../sample/hearthstone-7level.png', 'rb')})
 
-        with open('../sample/hearthstone-7level.png', 'rb') as f:
-            self.assertSequenceEqual(f.read(), res.content)
+            with open('../sample/hearthstone-7level.png', 'rb') as f:
+                try:
+                    self.assertSequenceEqual(f.read(), res.content)
+                except:
+                    fails += 1
 
+        print('fails', fails)
         p.terminate()
         p.join()
