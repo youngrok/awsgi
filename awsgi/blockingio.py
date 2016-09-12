@@ -1,5 +1,6 @@
 import io
 import time
+from threading import Lock
 
 
 class BlockingIO(io.BytesIO):
@@ -15,8 +16,9 @@ class BlockingIO(io.BytesIO):
 
         result = b''
         while not result:
-            self.seek(self.read_pos)
-            result = super().readline()
+            with Lock():
+                self.seek(self.read_pos)
+                result = super().readline()
 
             if self.got_eof:
                 return result
@@ -29,8 +31,9 @@ class BlockingIO(io.BytesIO):
 
         result = b''
         while not result:
-            self.seek(self.read_pos)
-            result = super().read(size)
+            with Lock():
+                self.seek(self.read_pos)
+                result = super().read(size)
 
             if self.got_eof:
                 break
