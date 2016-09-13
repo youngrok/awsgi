@@ -60,6 +60,6 @@ class WSGITest(unittest.TestCase):
                 except:
                     fails += 1
 
-        print('fails', fails)
+        self.assertEqual(0, fails)
         p.terminate()
         p.join()
