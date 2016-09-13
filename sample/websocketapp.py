@@ -16,17 +16,18 @@ async def application(environ, start_response):
 
     if get_request_header('Upgrade').lower() == 'websocket':
 
-        websocket_key = websockets.handshake.check_request(get_request_header)
-        websockets.handshake.build_response(set_response_header, websocket_key)
-
-        start_response('101 Switching Protocols', response_headers)
-
         class EchoProtocol(WebSocketProtocol):
 
             async def message_received(self, message):
                 await self.send(message)
 
-        environ['awsgi.protocol'].set_websocket_protocol(EchoProtocol)
+        environ['awsgi.upgrade'](EchoProtocol)
+
+        websocket_key = websockets.handshake.check_request(get_request_header)
+        websockets.handshake.build_response(set_response_header, websocket_key)
+
+        start_response('101 Switching Protocols', response_headers)
+
 
         return []
 

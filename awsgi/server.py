@@ -29,8 +29,7 @@ class AsyncWSGIProtocol(asyncio.Protocol):
         self.buffer = BlockingIO()
         self.content_length = 0
         self.closed = False
-        self.upgrade = False
-        self.websocket_protocol = None
+        self.upgraded_protocol = None
         self.body_read_pos = 0
 
     def connection_made(self, transport):
@@ -43,8 +42,8 @@ class AsyncWSGIProtocol(asyncio.Protocol):
 
     def data_received(self, data):
 
-        if self.websocket_protocol:
-            self.websocket_protocol.data_received(data)
+        if self.upgraded_protocol:
+            self.upgraded_protocol.data_received(data)
             return
 
         try:
@@ -53,7 +52,7 @@ class AsyncWSGIProtocol(asyncio.Protocol):
             '''
             let framework handle protocol upgrade
             '''
-            self.upgrade = True
+            pass
 
     def on_header(self, name, value):
         try:
@@ -75,8 +74,8 @@ class AsyncWSGIProtocol(asyncio.Protocol):
 
     def connection_lost(self, exc):
         self.closed = True
-        if self.websocket_protocol:
-            self.websocket_protocol.connection_lost(exc)
+        if self.upgraded_protocol:
+            self.upgraded_protocol.connection_lost(exc)
 
     def eof_received(self):
         self.buffer.feed_eof()
@@ -98,7 +97,7 @@ class AsyncWSGIProtocol(asyncio.Protocol):
         self.transport.write(data)
 
     def write_eof(self):
-        if not self.closed and not self.upgrade:
+        if not self.closed and not self.upgraded_protocol:
             self.transport.write_eof()
 
     def start_response(self, status, response_headers):
@@ -108,7 +107,7 @@ class AsyncWSGIProtocol(asyncio.Protocol):
                 self.content_length = header[1]
 
             if header[0].lower() == 'connection' and header[1].lower() == 'upgrade':
-                self.upgrade = True
+                assert self.upgraded_protocol
 
             self.write('{0}: {1}\r\n'.format(header[0], header[1]).encode('utf8'))
 
@@ -119,7 +118,7 @@ class AsyncWSGIProtocol(asyncio.Protocol):
         path_info = url_unquote(request_url.path)
 
         environ = {
-            'awsgi.protocol': self,
+            'awsgi.upgrade': self.upgrade,
             'wsgi.version': (1, 0),
             'wsgi.url_scheme': 'http',
             'wsgi.input': self.buffer,
@@ -150,9 +149,9 @@ class AsyncWSGIProtocol(asyncio.Protocol):
 
         return environ
 
-    def set_websocket_protocol(self, websocket_protocol):
-        self.websocket_protocol = websocket_protocol(self.loop)
-        self.websocket_protocol.connection_made(self.transport)
+    def upgrade(self, websocket_protocol):
+        self.upgraded_protocol = websocket_protocol(self.loop)
+        self.upgraded_protocol.connection_made(self.transport)
 
 
 def serve(application, host='127.0.0.1', port=8000, threads=1, wsgi=False, loop=None):
