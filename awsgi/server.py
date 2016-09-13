@@ -152,6 +152,7 @@ class AsyncWSGIProtocol(asyncio.Protocol):
     def upgrade(self, websocket_protocol):
         self.upgraded_protocol = websocket_protocol(self.loop)
         self.upgraded_protocol.connection_made(self.transport)
+        return self.upgraded_protocol
 
 
 def serve(application, host='127.0.0.1', port=8000, threads=1, wsgi=False, loop=None):
