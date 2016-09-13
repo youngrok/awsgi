@@ -5,6 +5,7 @@ import unittest
 import requests
 from multiprocessing import Process
 
+import time
 import websockets.client
 
 from awsgi.server import serve
@@ -31,6 +32,7 @@ class WSGITest(unittest.TestCase):
         p = Process(target=serve, args=[websocketapp.application])
         p.start()
 
+        time.sleep(0.1)
         loop = asyncio.get_event_loop()
 
         async def test_echo():
