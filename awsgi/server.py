@@ -95,6 +95,7 @@ class AsyncWSGIProtocol(asyncio.Protocol):
 
     def write(self, data):
         self.transport.write(data)
+        print('write', data)
 
     def write_eof(self):
         if not self.closed and not self.upgraded_protocol:
@@ -157,7 +158,8 @@ class AsyncWSGIProtocol(asyncio.Protocol):
 
 def serve(application, host='127.0.0.1', port=8000, threads=1, wsgi=False, loop=None):
     asyncio.set_event_loop_policy(uvloop.EventLoopPolicy())
-    loop = loop or asyncio.get_event_loop()
+    loop = loop or asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
     loop.set_default_executor(ThreadPoolExecutor(max_workers=threads))
     if wsgi:
         application = adapter(application)
