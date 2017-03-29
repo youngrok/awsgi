@@ -155,18 +155,25 @@ class AsyncWSGIProtocol(asyncio.Protocol):
         return self.upgraded_protocol
 
 
-def serve(application, host='127.0.0.1', port=8000, threads=1, wsgi=False, loop=None):
+def serve(application, host='127.0.0.1', port=8000, socks=None, threads=1, wsgi=False, loop=None):
     asyncio.set_event_loop_policy(uvloop.EventLoopPolicy())
     loop = loop or asyncio.get_event_loop()
     loop.set_default_executor(ThreadPoolExecutor(max_workers=threads))
     if wsgi:
         application = adapter(application)
 
-    server = loop.run_until_complete(
-        loop.create_server(lambda: AsyncWSGIProtocol(application, loop), host=host, port=port))
-    print('aWSGI server started at http://{0}:{1}/'.format(*server.sockets[0].getsockname()))
-    print('{} threads working.'.format(threads))
-    print('Quit server with {}'.format('CTRL-BREAK' if sys.platform == 'win32' else 'CONTROL-C'))
+    servers = []
+    if socks:
+        for sock in socks:
+            server = loop.run_until_complete(loop.create_server(lambda: AsyncWSGIProtocol(application, loop), sock=sock))
+            servers.append(server)
+    else:
+        server = loop.run_until_complete(loop.create_server(lambda: AsyncWSGIProtocol(application, loop), host=host, port=port))
+        servers.append(server)
+
+    # print('aWSGI server started at http://{0}:{1}/'.format(*server.sockets[0].getsockname()))
+    # print('{} threads working.'.format(threads))
+    # print('Quit server with {}'.format('CTRL-BREAK' if sys.platform == 'win32' else 'CONTROL-C'))
 
     try:
         loop.run_forever()
@@ -176,7 +183,9 @@ def serve(application, host='127.0.0.1', port=8000, threads=1, wsgi=False, loop=
         sys.exit(0)
 
     finally:
-        server.close()
+        for server in servers:
+            server.close()
+
         loop.close()
 
 
